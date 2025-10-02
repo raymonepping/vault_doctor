@@ -136,3 +136,4 @@ bin/
 *.out
 *.log
 coverage.*
+homebrew-tap/
