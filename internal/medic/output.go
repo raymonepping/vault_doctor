@@ -7,15 +7,25 @@ import (
 	"time"
 )
 
+func normVersion(v string) string {
+	v = strings.TrimSpace(v)
+	// Treat empty, "dev", or bare "v" (bad inject) as dev
+	if v == "" || v == "dev" || v == "v" {
+		return "dev"
+	}
+	// Always return a single leading "v" for banner display
+	return "v" + strings.TrimPrefix(v, "v")
+}
+
 func printBanner(version string, opt Options) {
 	if opt.Quiet || opt.JSON {
 		return
 	}
-	fmt.Printf("%s %s  %s  v%s\n",
+	fmt.Printf("%s %s  %s  %s\n",
 		cwrap("🩺 vault_doctor", colGreen, opt),
 		cwrap("medic", colYellow, opt),
 		cwrap("", colReset, opt),
-		version,
+		normVersion(version),
 	)
 }
 

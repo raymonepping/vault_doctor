@@ -104,3 +104,17 @@ func doGET(client *http.Client, cfg Config, path string, out any) (int, error) {
 	}
 	return code, nil
 }
+
+func formatExpiry(exp string) string {
+	if exp == "" {
+		return ""
+	}
+	return fmt.Sprintf(", expires=%s", exp)
+}
+
+func formatFeatures(feats []string) string {
+	if len(feats) == 0 {
+		return ""
+	}
+	return fmt.Sprintf(", features=%v", feats)
+}

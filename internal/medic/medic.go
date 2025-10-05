@@ -3,7 +3,9 @@ package medic
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -67,6 +69,45 @@ func Run(opt Options) int {
 		if health.ServerTimeUTC != 0 {
 			results = append(results, check{"Server time", true, fmt.Sprintf("%d", health.ServerTimeUTC)})
 		}
+
+		// ---- Enterprise detection + License status ----
+		// ---- Enterprise detection + License status (guarded) ----
+		if strings.Contains(health.Version, "+ent") {
+			results = append(results, check{"Vault version", true, fmt.Sprintf("%s (enterprise detected)", health.Version)})
+
+			if lic, lcode, lerr := vaultLicenseStatus(client, cfg); lerr != nil {
+				results = append(results, check{"License status", false, fmt.Sprintf("error: %v", lerr)})
+			} else {
+				switch lcode {
+				case http.StatusForbidden:
+					results = append(results, check{"License status", false, "forbidden (insufficient perms)"})
+				case http.StatusNotFound:
+					results = append(results, check{"License status", false, "not available (endpoint disabled or OSS-like behavior)"})
+				case http.StatusOK:
+					// Only show a “state” row if we actually have content
+					state := strings.TrimSpace(lic.State)
+					exp := strings.TrimSpace(lic.ExpiryTime)
+					hasFeatures := len(lic.Features) > 0
+					switch {
+					case state == "" && exp == "" && !hasFeatures:
+						results = append(results, check{"License status", true, "available, no details reported"})
+					default:
+						results = append(results, check{"License state", true,
+							fmt.Sprintf("%s%s%s",
+								state,
+								formatExpiry(exp),
+								formatFeatures(lic.Features),
+							),
+						})
+					}
+				default:
+					results = append(results, check{"License status", false, fmt.Sprintf("unexpected HTTP %d", lcode)})
+				}
+			}
+		} else {
+			results = append(results, check{"Vault version", true, health.Version})
+		}
+
 	} else {
 		results = append(results, check{"Health payload", false, "no JSON body returned"})
 	}

@@ -137,3 +137,19 @@ bin/
 *.log
 coverage.*
 homebrew-tap/
+
+# build outputs
+/bin/
+/dist/
+
+# local tarballs, accidental downloads
+v*.tar.gz
+vv*.tar.gz
+
+# accidental file from typing `go` alone
+/go
+
+# editors/OS
+.DS_Store
+.idea/
+.vscode/

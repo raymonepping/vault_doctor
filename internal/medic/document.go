@@ -7,6 +7,7 @@ func Doc(version string) string {
 	return fmt.Sprintf(`vault_doctor
 
 Usage:
+  vault_doctor completion [bash|zsh|fish]
   vault_doctor medic [--json] [--quiet] [--no-color]
   vault_doctor -V|--version
   vault_doctor -h|--help

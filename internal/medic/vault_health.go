@@ -6,6 +6,10 @@ import (
 	"strings"
 )
 
+// ---------------------------
+// Types
+// ---------------------------
+
 type healthResp struct {
 	Initialized   bool   `json:"initialized"`
 	Sealed        bool   `json:"sealed"`
@@ -33,6 +37,17 @@ type healthResp struct {
 	} `json:"replication_performance,omitempty"`
 }
 
+// Enterprise license status (Enterprise only)
+type licenseStatusResp struct {
+	State      string   `json:"state"`       // "active", "expired", etc.
+	ExpiryTime string   `json:"expiry_time"` // RFC3339 timestamp
+	Features   []string `json:"features"`    // list of enabled features
+}
+
+// ---------------------------
+// Health
+// ---------------------------
+
 func vaultHealth(client *http.Client, cfg Config) (*healthResp, int, error) {
 	url := strings.TrimRight(cfg.Addr, "/") + "/v1/sys/health"
 	req, err := http.NewRequest(http.MethodGet, url, nil)
@@ -50,6 +65,12 @@ func vaultHealth(client *http.Client, cfg Config) (*healthResp, int, error) {
 	status := res.StatusCode
 	var out healthResp
 	_ = json.NewDecoder(res.Body).Decode(&out)
+
+	// Enterprise detection via version string
+	if strings.Contains(out.Version, "+ent") {
+		out.Enterprise = true
+	}
+
 	return &out, status, nil
 }
 
@@ -109,4 +130,35 @@ func collectHints(h *healthResp, status int) []string {
 		}
 	}
 	return hints
+}
+
+// ---------------------------
+// License (Enterprise only)
+// ---------------------------
+
+func vaultLicenseStatus(client *http.Client, cfg Config) (*licenseStatusResp, int, error) {
+	url := strings.TrimRight(cfg.Addr, "/") + "/v1/sys/license/status"
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, 0, err
+	}
+	withVaultHeaders(req, cfg)
+
+	res, err := client.Do(req)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer res.Body.Close()
+
+	code := res.StatusCode
+	// 404 means OSS build or endpoint not available
+	if code == http.StatusNotFound {
+		return nil, code, nil
+	}
+
+	var out licenseStatusResp
+	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
+		return nil, code, err
+	}
+	return &out, code, nil
 }
