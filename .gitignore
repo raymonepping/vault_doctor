@@ -153,3 +153,4 @@ vv*.tar.gz
 .DS_Store
 .idea/
 .vscode/
+/scripts/*.sh

@@ -35,7 +35,9 @@ TARBALL_URL := https://github.com/$(GH_OWNER)/$(REPO_NAME)/archive/refs/tags/$(V
 TARBALL     := $(CURDIR)/v$(VERSION).tar.gz
 
 # -------- Phony targets --------
-.PHONY: all build dev fmt vet lint test clean release publish completions install-completions check-tag check-clean print-version gorelease brew-bump brew-push check-bins
+.PHONY: all build dev fmt vet lint test clean release publish completions \
+        install-completions check-tag check-clean print-version gorelease \
+        brew-bump brew-push check-bins brew-doctor
 
 all: build
 
@@ -130,41 +132,18 @@ install-completions: completions
 	@echo "Installed completions. Restart your shell (or re-source completion directories)."
 
 # ---- Brew / Tap automation ----
+# ---- Brew / Tap automation ----
 brew-bump: check-tag
 	@echo "▶ Downloading $(TARBALL_URL)"
-	@curl -sSL -o $(TARBALL) "$(TARBALL_URL)"
-	@echo "▶ Calculating sha256"
-	@SHA=$$(shasum -a 256 $(TARBALL) | awk '{print $$1}'); \
-	echo "sha256=$$SHA"; \
-	echo "▶ Writing formula $(TAP_FORMULA)"; \
-	printf "%s\n" \
-"class VaultDoctor < Formula" \
-"  desc \"Medic for HashiCorp Vault: health, caps, KV, transit\"" \
-"  homepage \"https://github.com/$(GH_OWNER)/$(REPO_NAME)\"" \
-"  version \"$(STRIPPED_VERSION)\"" \
-"  url \"https://github.com/$(GH_OWNER)/$(REPO_NAME)/archive/refs/tags/$(VERSION).tar.gz\"" \
-"  sha256 \"$$SHA\"" \
-"  license \"MPL-2.0\"" \
-"" \
-"  depends_on \"go\" => :build" \
-"" \
-"  def install" \
-"    mod = Utils.safe_popen_read(\"go\", \"list\", \"-m\").chomp" \
-"    ldflags = [" \
-"      \"-s -w\"," \
-"      \"-X \#{mod}/internal/version.Version=v\#{version}\"," \
-"      \"-X main.buildVersion=v\#{version}\"," \
-"    ].join(\" \")" \
-"    ohai \"Module: \#{mod}\"" \
-"    ohai \"ldflags: \#{ldflags}\"" \
-"    system \"go\", \"build\", \"-trimpath\", \"-ldflags\", ldflags, \"-o\", bin/\"vault_doctor\", \"./cmd/vault_doctor\"" \
-"  end" \
-"" \
-"  test do" \
-"    assert_match version.to_s, shell_output(\"#{bin}/vault_doctor -V\")" \
-"  end" \
-"end" \
-	> $(TAP_FORMULA)
+	@curl -sSL -o "$(TARBALL)" "$(TARBALL_URL)"
+	@echo "▶ Calculating sha256 & writing formula $(TAP_FORMULA)"
+	@VERSION="$(VERSION)" \
+	 STRIPPED_VERSION="$(STRIPPED_VERSION)" \
+	 GH_OWNER="$(GH_OWNER)" \
+	 REPO_NAME="$(REPO_NAME)" \
+	 TARBALL="$(TARBALL)" \
+	 TAP_FORMULA="$(TAP_FORMULA)" \
+	 ./scripts/write_formula.sh
 	@echo "✅ Brew formula updated for $(VERSION)"
 
 brew-push:
@@ -172,6 +151,15 @@ brew-push:
 	@cd homebrew-tap && git commit -m "vault_doctor: bump to $(VERSION)" || echo "No changes to commit."
 	@cd homebrew-tap && git push origin main
 	@echo "🚀 Tap update pushed to raymonepping/homebrew-tap"
+
+# Show what brew will actually compile
+brew-doctor:
+	@TAPDIR="$$(brew --repo $(GH_OWNER)/tap)"; \
+	F="$$TAPDIR/Formula/vault_doctor.rb"; \
+	echo ">>> Showing current formula at: $$F"; \
+	echo "------------------------------"; \
+	sed -n '1,999p' "$$F"; \
+	echo "------------------------------"
 
 check-bins:
 	@echo "Local bin:"; ./bin/$(APP) -V || true; ./bin/$(APP) medic | sed -n '1p' || true; echo
